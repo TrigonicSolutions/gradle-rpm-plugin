@@ -16,37 +16,45 @@
 
 package com.trigonic.gradle.plugins.rpm
 
-import java.lang.reflect.Field
-
+import com.trigonic.gradle.plugins.packaging.AliasHelper
+import com.trigonic.gradle.plugins.packaging.CommonPackagingPlugin
 import org.freecompany.redline.Builder
+import org.freecompany.redline.header.Architecture
+import org.freecompany.redline.header.Flags
+import org.freecompany.redline.header.Os
+import org.freecompany.redline.header.RpmType
 import org.freecompany.redline.payload.Directive
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.internal.file.copy.CopySpecImpl
-import org.gradle.api.plugins.BasePlugin
 
 class RpmPlugin implements Plugin<Project> {
     void apply(Project project) {
-        project.plugins.apply(BasePlugin.class)
-        
+        project.plugins.apply(CommonPackagingPlugin.class)
+
         project.ext.Rpm = Rpm.class
 
-        CopySpecImpl.metaClass.user = null
-        CopySpecImpl.metaClass.group = null
-        CopySpecImpl.metaClass.fileType = null
-        CopySpecImpl.metaClass.createDirectoryEntry = null
-        CopySpecImpl.metaClass.addParentDirs = true
-
-        Field.metaClass.hasModifier = { modifier ->
-            (modifiers & modifier) == modifier 
-        }
-        
         Builder.metaClass.getDefaultSourcePackage() {
             format.getLead().getName() + "-src.rpm"
         }
-        
+
         Directive.metaClass.or = { Directive other ->
             new Directive(delegate.flag | other.flag)
         }
+
+        // Some defaults, if not set by the user
+        project.tasks.withType(Rpm) { Rpm task ->
+            applyAliases(task)
+
+            task.applyConventions()
+        }
+
+    }
+
+    def static applyAliases(def dynamicObjectAware) {
+        AliasHelper.aliasEnumValues(Architecture.values(), dynamicObjectAware)
+        AliasHelper.aliasEnumValues(Os.values(), dynamicObjectAware)
+        AliasHelper.aliasEnumValues(RpmType.values(), dynamicObjectAware)
+        AliasHelper.aliasStaticInstances(Directive.class, dynamicObjectAware)
+        AliasHelper.aliasStaticInstances(Flags.class, int.class, dynamicObjectAware)
     }
 }
