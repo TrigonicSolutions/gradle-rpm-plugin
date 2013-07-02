@@ -62,6 +62,7 @@ class RpmPluginTest {
             distribution = 'SuperSystem'
             vendor = 'Super Associates, LLC'
             url = 'http://www.example.com/'
+            prefixes = '/opt/bleah'
             
             requires('blarg', '1.0', GREATER | EQUAL)
             requires('blech')
@@ -89,6 +90,7 @@ class RpmPluginTest {
         assertEquals('1', getHeaderEntryString(scan, RELEASE))
         assertEquals('i386', getHeaderEntryString(scan, ARCH))
         assertEquals('linux', getHeaderEntryString(scan, OS))
+        assertEquals('/opt/bleah', getHeaderEntryString(scan, PREFIXES))
         assertEquals(['./a/path/not/to/create/alone', './opt/bleah',
                       './opt/bleah/apple', './opt/bleah/banana'], scan.files*.name)
         assertEquals([FILE, DIR, FILE, SYMLINK], scan.files*.type)

@@ -55,6 +55,7 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
         builder.setDistribution task.distribution
         builder.setVendor task.vendor
         builder.setUrl task.url
+        builder.setPrefixes task.prefixes
         builder.setProvides task.provides ?: task.packageName
 
         String sourcePackage = task.sourcePackage
