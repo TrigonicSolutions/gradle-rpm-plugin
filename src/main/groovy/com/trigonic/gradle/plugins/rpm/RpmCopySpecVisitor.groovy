@@ -16,134 +16,145 @@
 
 package com.trigonic.gradle.plugins.rpm
 
+import com.google.common.base.Preconditions
+import com.trigonic.gradle.plugins.packaging.AbstractPackagingCopySpecVisitor
+import com.trigonic.gradle.plugins.packaging.Dependency
+import com.trigonic.gradle.plugins.packaging.Link
 import org.freecompany.redline.Builder
 import org.freecompany.redline.header.Header.HeaderTag
+import org.freecompany.redline.payload.Directive
 import org.gradle.api.file.FileVisitDetails
 import org.gradle.api.internal.file.copy.CopyAction
-import org.gradle.api.internal.file.copy.EmptyCopySpecVisitor
+import org.gradle.api.internal.file.copy.CopySpecImpl
+import org.gradle.api.internal.file.copy.MappingCopySpecVisitor
 import org.gradle.api.internal.file.copy.ReadableCopySpec
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
+import java.nio.channels.FileChannel
+
+class RpmCopySpecVisitor extends AbstractPackagingCopySpecVisitor {
     static final Logger logger = LoggerFactory.getLogger(RpmCopySpecVisitor.class)
 
-    Rpm task
+    Rpm rpmTask
     Builder builder
-    File destinationDir
-    ReadableCopySpec spec
-    boolean didWork
-    boolean includeStandardDefines = true
+    boolean includeStandardDefines = true // candidate for being pushed up to packaging level
+
+    RpmCopySpecVisitor(Rpm rpmTask) {
+        super(rpmTask)
+        this.rpmTask = rpmTask
+    }
 
     @Override
     void startVisit(CopyAction action) {
-        task = action.task
+        super.startVisit(action)
 
-        destinationDir = task.destinationDir
-        didWork = false
+        Preconditions.checkNotNull(rpmTask.getVersion(), "RPM require a version string" )
 
         builder = new Builder()
-        builder.setPackage task.packageName, task.version, task.release
-        builder.setType task.type
-        builder.setPlatform task.arch, task.os
-        builder.setGroup task.packageGroup
-        builder.setBuildHost task.buildHost
-        builder.setSummary task.summary
-        builder.setDescription task.description
-        builder.setLicense task.license
-        builder.setPackager task.packager
-        builder.setDistribution task.distribution
-        builder.setVendor task.vendor
-        builder.setUrl task.url
-        builder.setProvides task.provides ?: task.packageName
+        builder.setPackage rpmTask.packageName, rpmTask.version, rpmTask.release
+        builder.setType rpmTask.type
+        builder.setPlatform rpmTask.arch, rpmTask.os
+        builder.setGroup rpmTask.packageGroup
+        builder.setBuildHost rpmTask.buildHost
+        builder.setSummary rpmTask.summary
+        builder.setDescription rpmTask.packageDescription
+        builder.setLicense rpmTask.license
+        builder.setPackager rpmTask.packager
+        builder.setDistribution rpmTask.distribution
+        builder.setVendor rpmTask.vendor
+        builder.setUrl rpmTask.url
+        builder.setProvides rpmTask.provides
 
-        String sourcePackage = task.sourcePackage
+        String sourcePackage = rpmTask.sourcePackage
         if (!sourcePackage) {
             // need a source package because createrepo will assume your package is a source package without it
             sourcePackage = builder.defaultSourcePackage
         }
         builder.addHeaderEntry HeaderTag.SOURCERPM, sourcePackage
-        
-        builder.setPreInstallScript(scriptWithUtils(task.installUtils, task.preInstall))
-        builder.setPostInstallScript(scriptWithUtils(task.installUtils, task.postInstall))
-        builder.setPreUninstallScript(scriptWithUtils(task.installUtils, task.preUninstall))
-        builder.setPostUninstallScript(scriptWithUtils(task.installUtils, task.postUninstall))
-    }
 
-    @Override
-    void visitSpec(ReadableCopySpec spec) {
-        this.spec = spec
+        builder.setPreInstallScript(scriptWithUtils(rpmTask.allCommonCommands, rpmTask.allPreInstallCommands))
+        builder.setPostInstallScript(scriptWithUtils(rpmTask.allCommonCommands, rpmTask.allPostInstallCommands))
+        builder.setPreUninstallScript(scriptWithUtils(rpmTask.allCommonCommands, rpmTask.allPreUninstallCommands))
+        builder.setPostUninstallScript(scriptWithUtils(rpmTask.allCommonCommands, rpmTask.allPostUninstallCommands))
     }
 
     @Override
     void visitFile(FileVisitDetails fileDetails) {
         logger.debug "adding file {}", fileDetails.relativePath.pathString
-        builder.addFile "/" + fileDetails.relativePath.pathString, fileDetails.file,
-            spec.fileMode == null ? -1 : spec.fileMode, -1, spec.fileType, spec.user ?: task.user, spec.group ?: task.group,
-                spec.addParentDirs
+        def specToLookAt = (spec instanceof CopySpecImpl)?spec:spec.spec // WrapperCopySpec has a nested spec
+
+        def outputFile = extractFile(fileDetails)
+
+        def path = "/" + fileDetails.relativePath.pathString
+        int fileMode = lookup(specToLookAt, 'fileMode') ?: -1
+        Directive fileType = lookup(specToLookAt, 'fileType')
+        String user = lookup(specToLookAt, 'user') ?: rpmTask.user
+        String group = lookup(specToLookAt, 'permissionGroup') ?: rpmTask.permissionGroup
+
+        def specAddParentsDir = lookup(specToLookAt, 'addParentDirs')
+        boolean addParentsDir = specAddParentsDir!=null ? specAddParentsDir : rpmTask.addParentDirs
+
+        builder.addFile( path, outputFile, fileMode, -1, fileType, user, group, addParentsDir)
     }
 
     @Override
     void visitDir(FileVisitDetails dirDetails) {
-        if (spec.createDirectoryEntry) {
+        def specToLookAt = (spec instanceof CopySpecImpl)?spec:spec.spec // WrapperCopySpec has a nested spec
+
+        // Have to take booleans specially, since they would fail an elvis operator if set to false
+        def specCreateDirectoryEntry = lookup(specToLookAt, 'createDirectoryEntry')
+        boolean createDirectoryEntry = specCreateDirectoryEntry!=null ? specCreateDirectoryEntry : rpmTask.createDirectoryEntry
+        def specAddParentsDir = lookup(specToLookAt, 'addParentDirs')
+        boolean addParentsDir = specAddParentsDir!=null ? specAddParentsDir : rpmTask.addParentDirs
+        if (createDirectoryEntry) {
             logger.debug "adding directory {}", dirDetails.relativePath.pathString
-            builder.addDirectory "/" + dirDetails.relativePath.pathString, spec.dirMode == null ? -1 : spec.dirMode,
-                spec.fileType, spec.user ?: task.user, spec.group ?: task.group, spec.addParentDirs
+            builder.addDirectory(
+                    "/" + dirDetails.relativePath.pathString,
+                    (int) (lookup(specToLookAt, 'dirMode') ?: -1),
+                    (Directive) lookup(specToLookAt, 'fileType') ?: rpmTask.fileType,
+                    (String) lookup(specToLookAt, 'user') ?: rpmTask.user,
+                    (String) lookup(specToLookAt, 'permissionGroup') ?: rpmTask.permissionGroup,
+                    (boolean) addParentsDir
+            )
         }
     }
 
     @Override
-    void endVisit() {
-        for (Link link : task.links) {
-            logger.debug "adding link {} -> {}", link.path, link.target
-            builder.addLink link.path, link.target, link.permissions
-        }
-        
-        for (Dependency dep : task.dependencies) {
-            logger.debug "adding dependency on {} {}", dep.packageName, dep.version
-            builder.addDependency dep.packageName, dep.version, dep.flag
-        }
-        
-        String rpmFile = builder.build(destinationDir)
-        didWork = true
+    protected void addLink(Link link) {
+        builder.addLink link.path, link.target, link.permissions
+    }
+
+    @Override
+    protected void addDependency(Dependency dep) {
+        builder.addDependency dep.packageName, dep.version, dep.flag
+    }
+
+    @Override
+    protected void end() {
+        File rpmFile = rpmTask.getArchivePath()
+        FileChannel fc = new RandomAccessFile( rpmFile, "rw").getChannel()
+        builder.build(fc)
         logger.info 'Created rpm {}', rpmFile
     }
 
-    @Override
-    boolean getDidWork() {
-        didWork
-    }
-    
     String standardScriptDefines() {
-        includeStandardDefines ? 
+        includeStandardDefines ?
             String.format(" RPM_ARCH=%s \n RPM_OS=%s \n RPM_PACKAGE_NAME=%s \n RPM_PACKAGE_VERSION=%s \n RPM_PACKAGE_RELEASE=%s \n\n",
-                task?.arch?.toString().toLowerCase(), task?.os?.toString()?.toLowerCase(), task?.packageName, task?.version, task?.release) : null 
+                rpmTask.getArchString(),
+                rpmTask.os?.toString().toLowerCase(),
+                rpmTask.getPackageName(),
+                rpmTask.getVersion(),
+                rpmTask.getRelease()) : null
     }
-    
-    Object scriptWithUtils(File utils, File script) {
-        concat(standardScriptDefines(), utils, script)
-    }
-    
-    String concat(Object... scripts) {
-        String shebang
-        StringBuilder result = new StringBuilder();        
-        scripts.each { script ->
-            script?.eachLine { line ->
-                if (line.matches('^#!.*$')) {
-                    if (!shebang) {
-                        shebang = line
-                    } else if (line != shebang) {
-                        throw new IllegalArgumentException("mismatching #! script lines")
-                    }
-                } else {
-                    result.append line
-                    result.append "\n"
-                }
-            }
-        }
-        if (shebang) {
-            result.insert(0, shebang + "\n")
-        }
-        result.toString()
+
+    Object scriptWithUtils(List utils, List scripts) {
+        def l = []
+        def stdDefines = standardScriptDefines()
+        if(stdDefines) l.add(stdDefines)
+        l.addAll(utils)
+        l.addAll(scripts)
+
+        concat(l)
     }
 }

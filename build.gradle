@@ -1,20 +1,10 @@
 apply plugin: 'groovy'
 apply plugin: 'eclipse'
-apply plugin: 'nexus'
 apply plugin: 'idea'
+apply plugin: 'maven'
 
 group = 'com.trigonic'
-version = '1.4-SNAPSHOT'
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'org.gradle.api.plugins:gradle-nexus-plugin:0.2'
-    }
-}
+description 'Provides a task similar to Tar and Zip for constructing RPM package files.'
 
 repositories {
     mavenCentral()
@@ -22,9 +12,17 @@ repositories {
 
 dependencies {
     compile gradleApi()
-    compile 'org.redline-rpm:redline:1.1.10+'
+    compile 'org.redline-rpm:redline:1.1.10'
+    compile('org.vafer:jdeb:1.0.1') {
+        // Individual listing so that they translate into the pom file
+        exclude group: 'org.apache.maven', module: 'maven-core'
+        exclude group: 'org.apache.maven', module: 'maven-plugin-api'
+        exclude group: 'org.apache.maven', module: 'maven-project'
+        exclude group: 'org.apache.maven', module: 'maven-artifact'
+        exclude group: 'org.codehaus.plexus', module: 'plexus-utils'
+    }
 
-    groovy 'org.codehaus.groovy:groovy:1.8.+'
+    compile localGroovy()
 
     testCompile 'junit:junit:4.+'
     testCompile([group: 'org.gmock', name: 'gmock', version: '0.8.2', transitive: false])
@@ -46,48 +44,7 @@ artifacts {
     archives packageSources
 }
 
-modifyPom {
-    project {
-        name 'gradle-rpm-plugin - Gradle plugin for constructing RPM packages'
-        packaging 'jar'
-        description 'Provides a task similar to Tar and Zip for constructing RPM package files.'
-        url 'https://github.com/TrigonicSolutions/gradle-rpm-plugin'
-        inceptionYear '2011'
-
-        parent {
-            groupId 'org.sonatype.oss'
-            artifactId 'oss-parent'
-            version '7'
-        }
- 
-        scm {
-            url 'scm:git://github.com/TrigonicSolutions/gradle-rpm-plugin.git'
-            connection 'scm:git://github.com/TrigonicSolutions/gradle-rpm-plugin.git'
-        }
- 
-        licenses {
-            license {
-                name 'The Apache Software License, Version 2.0'
-                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                distribution 'repo'
-            }
-        }
- 
-        developers {
-            developer {
-                id 'akrueger'
-                name 'Alan Krueger'
-                email 'alan@trigonic.com'
-                roles{
-                    role 'Developer'
-                }
-                timezone '-6'
-            }
-        }
-    }
-}
-
 task createWrapper(type: Wrapper) {
-    gradleVersion = '1.2'
+    gradleVersion = '1.6'
 }
 
