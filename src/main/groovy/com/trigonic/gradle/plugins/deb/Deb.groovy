@@ -14,42 +14,39 @@
  * limitations under the License.
  */
 
-package com.trigonic.gradle.plugins.rpm
+package com.trigonic.gradle.plugins.deb
 
 import com.trigonic.gradle.plugins.packaging.AbstractPackagingCopyAction
 import com.trigonic.gradle.plugins.packaging.SystemPackagingTask
-import org.freecompany.redline.header.Architecture
-import org.freecompany.redline.header.Os
-import org.freecompany.redline.header.RpmType
 import org.gradle.api.internal.ConventionMapping
 import org.gradle.api.internal.IConventionAware
 
-class Rpm extends SystemPackagingTask {
-    static final String RPM_EXTENSION = "rpm";
+class Deb extends SystemPackagingTask {
+    static final String DEB_EXTENSION = "deb";
 
-    Rpm() {
+    Deb() {
         super()
-        extension = RPM_EXTENSION
+        extension = DEB_EXTENSION
     }
 
     @Override
     String assembleArchiveName() {
         String name = getPackageName();
-        name += getVersion() ? "-${getVersion()}" : ''
+        name += getVersion() ? "_${getVersion()}" : ''
         name += getRelease() ? "-${getRelease()}" : ''
-        name += getArchString() ? ".${getArchString()}" : ''
+        name += getArchString() ? "_${getArchString()}" : ''
         name += getExtension() ? ".${getExtension()}" : ''
         return name;
     }
 
     @Override
     protected String getArchString() {
-        return arch?.name().toLowerCase();
+        return 'all'; // TODO Make this configurable
     }
 
     @Override
     AbstractPackagingCopyAction createCopyAction() {
-        return new RpmCopyAction(this)
+        return new DebCopyAction(this)
     }
 
     @Override
@@ -61,11 +58,9 @@ class Rpm extends SystemPackagingTask {
         ConventionMapping mapping = ((IConventionAware) this).getConventionMapping()
 
         // Could come from extension
-        mapping.map('fileType', { parentExten?.getFileType() })
-        mapping.map('addParentDirs', { parentExten?.getAddParentDirs()?:true })
-        mapping.map('arch', { parentExten?.getArch()?:Architecture.NOARCH})
-        mapping.map('os', { parentExten?.getOs()?:Os.UNKNOWN})
-        mapping.map('type', { parentExten?.getType()?:RpmType.BINARY })
-    }
+        mapping.map('uid', { parentExten?.getUid()?:0 })
+        mapping.map('gid', { (parentExten?.getGid())?:0 })
+        mapping.map('packageGroup', { parentExten?.getPackageGroup() ?: 'java' })
 
+    }
 }

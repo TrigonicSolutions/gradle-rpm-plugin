@@ -17,37 +17,34 @@
 package com.trigonic.gradle.plugins.rpm
 
 import static org.junit.Assert.assertEquals
-import static org.junit.Assert.assertSame
 import static org.junit.Assert.assertTrue
-
-import java.io.File;
 
 import org.junit.Before
 import org.junit.Test
 
 class RpmCopySpecVisitorTest {
-    RpmCopySpecVisitor visitor
-    
+    RpmCopyAction visitor
+
     @Before
     public void setup() {
-        visitor = new RpmCopySpecVisitor()
+        visitor = new RpmCopyAction()
     }
-    
+
     @Test
     public void withoutUtils() {
         visitor.includeStandardDefines = false
         File script = resourceFile("script.sh")
-        Object result = visitor.scriptWithUtils(null, script)
+        Object result = visitor.scriptWithUtils([], [script])
         assertTrue result instanceof String
         assertEquals(
             "#!/bin/bash\n" +
             "hello\n", result)
     }
-    
+
     @Test
     public void withUtils() {
         visitor.includeStandardDefines = false
-        Object result = visitor.scriptWithUtils(resourceFile("utils.sh"), resourceFile("script.sh"))
+        Object result = visitor.scriptWithUtils([resourceFile("utils.sh")], [resourceFile("script.sh")])
         assertTrue result instanceof String
         assertEquals(
             "#!/bin/bash\n" +
@@ -56,7 +53,7 @@ class RpmCopySpecVisitorTest {
             "}\n" +
             "hello\n", result)
     }
-    
+
     File resourceFile(String name) {
         new File(getClass().getResource(name).getPath())
     }

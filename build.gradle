@@ -1,20 +1,10 @@
 apply plugin: 'groovy'
 apply plugin: 'eclipse'
-apply plugin: 'nexus'
 apply plugin: 'idea'
+apply plugin: 'maven'
 
 group = 'com.trigonic'
-version = '1.5-SNAPSHOT'
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'org.gradle.api.plugins:gradle-nexus-plugin:0.2'
-    }
-}
+description 'Provides a task similar to Tar and Zip for constructing RPM package files.'
 
 repositories {
     mavenCentral()
@@ -22,11 +12,21 @@ repositories {
 
 dependencies {
     compile gradleApi()
-    compile 'org.redline-rpm:redline:1.1.10+'
+    compile 'org.apache.commons:commons-lang3:3.1'
+    // Do NOT use a dynamic version like 1.1+, since it'll show up exactly like that in the pom, and 1.1+ is a proper maven version
+    compile 'org.redline-rpm:redline:1.1.10'
+    compile('org.vafer:jdeb:1.0.1') {
+        // Individual listing so that they translate into the pom file
+        exclude group: 'org.apache.maven', module: 'maven-core'
+        exclude group: 'org.apache.maven', module: 'maven-plugin-api'
+        exclude group: 'org.apache.maven', module: 'maven-project'
+        exclude group: 'org.apache.maven', module: 'maven-artifact'
+        exclude group: 'org.codehaus.plexus', module: 'plexus-utils'
+    }
 
     compile localGroovy()
 
-    testCompile 'junit:junit:4.+'
+    testCompile 'junit:junit:4.11'
     testCompile([group: 'org.gmock', name: 'gmock', version: '0.8.2', transitive: false])
 }
 
@@ -46,7 +46,7 @@ artifacts {
     archives packageSources
 }
 
-modifyPom {
+pom {
     project {
         name 'gradle-rpm-plugin - Gradle plugin for constructing RPM packages'
         packaging 'jar'
@@ -83,11 +83,26 @@ modifyPom {
                 }
                 timezone '-6'
             }
+            developer {
+                id 'quidryan'
+                name 'Justin Ryan'
+                email 'justin@halfempty.org'
+                roles{
+                    role 'Developer'
+                }
+                timezone '-8'
+            }
         }
     }
 }
 
+test {
+  testLogging {
+    exceptionFormat "full"
+  }
+}
+
 task createWrapper(type: Wrapper) {
-    gradleVersion = '1.7'
+    gradleVersion = '1.8'
 }
 
