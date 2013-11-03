@@ -59,12 +59,12 @@ modifyPom {
             artifactId 'oss-parent'
             version '7'
         }
- 
+
         scm {
             url 'scm:git://github.com/TrigonicSolutions/gradle-rpm-plugin.git'
             connection 'scm:git://github.com/TrigonicSolutions/gradle-rpm-plugin.git'
         }
- 
+
         licenses {
             license {
                 name 'The Apache Software License, Version 2.0'
@@ -72,7 +72,7 @@ modifyPom {
                 distribution 'repo'
             }
         }
- 
+
         developers {
             developer {
                 id 'akrueger'

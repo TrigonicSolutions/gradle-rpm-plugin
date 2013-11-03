@@ -56,6 +56,7 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
         builder.setVendor task.vendor
         builder.setUrl task.url
         builder.setProvides task.provides ?: task.packageName
+        builder.setPrefixes task.prefixes
 
         String sourcePackage = task.sourcePackage
         if (!sourcePackage) {
@@ -63,7 +64,7 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
             sourcePackage = builder.defaultSourcePackage
         }
         builder.addHeaderEntry HeaderTag.SOURCERPM, sourcePackage
-        
+
         builder.setPreInstallScript(scriptWithUtils(task.installUtils, task.preInstall))
         builder.setPostInstallScript(scriptWithUtils(task.installUtils, task.postInstall))
         builder.setPreUninstallScript(scriptWithUtils(task.installUtils, task.preUninstall))
@@ -98,12 +99,12 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
             logger.debug "adding link {} -> {}", link.path, link.target
             builder.addLink link.path, link.target, link.permissions
         }
-        
+
         for (Dependency dep : task.dependencies) {
             logger.debug "adding dependency on {} {}", dep.packageName, dep.version
             builder.addDependency dep.packageName, dep.version, dep.flag
         }
-        
+
         String rpmFile = builder.build(destinationDir)
         didWork = true
         logger.info 'Created rpm {}', rpmFile
@@ -113,20 +114,20 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
     boolean getDidWork() {
         didWork
     }
-    
+
     String standardScriptDefines() {
-        includeStandardDefines ? 
+        includeStandardDefines ?
             String.format(" RPM_ARCH=%s \n RPM_OS=%s \n RPM_PACKAGE_NAME=%s \n RPM_PACKAGE_VERSION=%s \n RPM_PACKAGE_RELEASE=%s \n\n",
-                task?.arch?.toString().toLowerCase(), task?.os?.toString()?.toLowerCase(), task?.packageName, task?.version, task?.release) : null 
+                task?.arch?.toString().toLowerCase(), task?.os?.toString()?.toLowerCase(), task?.packageName, task?.version, task?.release) : null
     }
-    
+
     Object scriptWithUtils(File utils, File script) {
         concat(standardScriptDefines(), utils, script)
     }
-    
+
     String concat(Object... scripts) {
         String shebang
-        StringBuilder result = new StringBuilder();        
+        StringBuilder result = new StringBuilder();
         scripts.each { script ->
             script?.eachLine { line ->
                 if (line.matches('^#!.*$')) {
