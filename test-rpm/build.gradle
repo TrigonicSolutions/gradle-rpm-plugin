@@ -1,0 +1,27 @@
+group = 'com.trigonic'
+version = '1.5-SNAPSHOT'
+
+apply plugin: 'rpm'
+
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.trigonic:gradle-rpm-plugin:1.5-SNAPSHOT'
+    }
+}
+
+
+task rpm(type: Rpm) {
+    prefixes = '/tmp/original'
+    os = LINUX
+    release = 1.0
+    from('src') {
+        into '/tmp/original'
+    }
+}
+

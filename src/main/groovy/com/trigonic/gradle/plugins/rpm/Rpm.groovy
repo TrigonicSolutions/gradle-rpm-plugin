@@ -51,6 +51,7 @@ class Rpm extends AbstractArchiveTask {
     String url = ''
     String sourcePackage
     String provides
+    String prefixes
     File installUtils
     File preInstall
     File postInstall
@@ -123,11 +124,11 @@ class Rpm extends AbstractArchiveTask {
     String getArchiveName() {
         String.format("%s-%s-%s.%s.%s", packageName, version, release, arch.name().toLowerCase(), extension)
     }
-    
+
     Link link(String path, String target) {
         link(path, target, -1)
     }
-    
+
     Link link(String path, String target, int permissions) {
         Link link = new Link()
         link.path = path
@@ -136,7 +137,7 @@ class Rpm extends AbstractArchiveTask {
         links.add(link)
         link
     }
-    
+
     Dependency requires(String packageName, String version, int flag) {
         Dependency dep = new Dependency()
         dep.packageName = packageName
@@ -145,7 +146,7 @@ class Rpm extends AbstractArchiveTask {
         dependencies.add(dep)
         dep
     }
-    
+
     Dependency requires(String packageName) {
         requires(packageName, '', 0)
     }
