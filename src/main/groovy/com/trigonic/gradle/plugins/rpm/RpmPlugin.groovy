@@ -16,19 +16,24 @@
 
 package com.trigonic.gradle.plugins.rpm
 
-import java.lang.reflect.Field
-
 import org.freecompany.redline.Builder
+import org.freecompany.redline.header.Architecture
+import org.freecompany.redline.header.Flags
+import org.freecompany.redline.header.Os
+import org.freecompany.redline.header.RpmType
 import org.freecompany.redline.payload.Directive
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.internal.file.copy.CopySpecImpl
 import org.gradle.api.plugins.BasePlugin
 
+import java.lang.reflect.Field
+import java.lang.reflect.Modifier
+
 class RpmPlugin implements Plugin<Project> {
     void apply(Project project) {
         project.plugins.apply(BasePlugin.class)
-        
+
         project.ext.Rpm = Rpm.class
 
         CopySpecImpl.metaClass.user = null
@@ -38,15 +43,64 @@ class RpmPlugin implements Plugin<Project> {
         CopySpecImpl.metaClass.addParentDirs = true
 
         Field.metaClass.hasModifier = { modifier ->
-            (modifiers & modifier) == modifier 
+            (modifiers & modifier) == modifier
         }
-        
+
         Builder.metaClass.getDefaultSourcePackage() {
             format.getLead().getName() + "-src.rpm"
         }
-        
+
         Directive.metaClass.or = { Directive other ->
             new Directive(delegate.flag | other.flag)
         }
+
+        CopySpecImpl.WrapperCopySpec.metaClass.getFileType= {->
+            return spec.fileType;
+        }
+
+        CopySpecImpl.WrapperCopySpec.metaClass.getUser= {->
+            return spec.user;
+        }
+
+        CopySpecImpl.WrapperCopySpec.metaClass.getAddParentDirs= {->
+            return spec.addParentDirs;
+        }
+
+        CopySpecImpl.WrapperCopySpec.metaClass.getCreateDirectoryEntry= {->
+            return spec.createDirectoryEntry;
+        }
+
+        CopySpecImpl.WrapperCopySpec.metaClass.getGroup= {->
+            return spec.group;
+        }
+
+        aliasEnumValues(Architecture.values())
+        aliasEnumValues(Os.values())
+        aliasEnumValues(RpmType.values())
+        aliasStaticInstances(Directive.class)
+        aliasStaticInstances(Flags.class, int.class)
+
     }
+
+
+    private <T extends Enum<T>> void aliasEnumValues(T[] values) {
+        for (T value : values) {
+            assert !CopySpecImpl.hasProperty(value.name())
+            CopySpecImpl.metaClass."${value.name()}" = value
+        }
+    }
+
+    private <T> void aliasStaticInstances(Class<T> forClass) {
+        aliasStaticInstances forClass, forClass
+    }
+
+    private <T, U> void aliasStaticInstances(Class<T> forClass, Class<U> ofClass) {
+        for (Field field : forClass.fields) {
+            if (field.type == ofClass && field.hasModifier(Modifier.STATIC)) {
+                assert !CopySpecImpl.metaClass.hasProperty(field.name)
+                CopySpecImpl.metaClass."${field.name}" = field.get(null)
+            }
+        }
+    }
+
 }

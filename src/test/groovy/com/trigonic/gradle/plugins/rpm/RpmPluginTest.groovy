@@ -16,6 +16,8 @@
 
 package com.trigonic.gradle.plugins.rpm
 
+import org.gradle.api.tasks.bundling.Tar
+
 import static org.junit.Assert.assertEquals
 import static org.junit.Assert.assertTrue
 
@@ -92,6 +94,81 @@ class RpmPluginTest {
         assertEquals(['./a/path/not/to/create/alone', './opt/bleah',
                       './opt/bleah/apple', './opt/bleah/banana'], scan.files*.name)
         assertEquals([FILE, DIR, FILE, SYMLINK], scan.files*.type)
+    }
+
+
+    @Test
+    public void filesWithCopySpec() {
+        Project project = ProjectBuilder.builder().build()
+
+        File buildDir = project.buildDir
+        File srcDir = new File(buildDir, 'src')
+        srcDir.mkdirs()
+        FileUtils.writeStringToFile(new File(srcDir, 'apple'), 'apple')
+
+        File noParentsDir = new File(buildDir, 'noParentsDir')
+        noParentsDir.mkdirs()
+        FileUtils.writeStringToFile(new File(noParentsDir, 'alone'), 'alone')
+
+        project.apply plugin: 'rpm'
+
+        def rpmCopySpec = project.copySpec {
+            into '/opt/bleah'
+            from(srcDir)
+
+            from(srcDir.toString() + '/main/groovy') {
+                fileMode = 0644
+                createDirectoryEntry = true
+                fileType = CONFIG | NOREPLACE
+            }
+
+            from(noParentsDir) {
+                fileMode = 0755
+                addParentDirs = false
+                into '/a/path/not/to/create'
+            }
+        }
+
+        project.task([type: Rpm], 'buildRpm', {
+            destinationDir = project.file('build/tmp/RpmPluginTest')
+            destinationDir.mkdirs()
+
+            packageName = 'bleah'
+            version = '1.0'
+            release = '1'
+            type = BINARY
+            arch = I386
+            os = LINUX
+            group = 'Development/Libraries'
+            summary = 'Bleah blarg'
+            description = 'Not a very interesting library.'
+            license = 'Free'
+            distribution = 'SuperSystem'
+            vendor = 'Super Associates, LLC'
+            url = 'http://www.example.com/'
+
+            with rpmCopySpec
+            link('/opt/bleah/banana', '/opt/bleah/apple')
+
+        })
+
+        project.tasks.buildRpm.execute()
+        def scan = Scanner.scan(project.file('build/tmp/RpmPluginTest/bleah-1.0-1.i386.rpm'))
+        assertEquals('bleah', getHeaderEntryString(scan, NAME))
+        assertEquals('1.0', getHeaderEntryString(scan, VERSION))
+        assertEquals('1', getHeaderEntryString(scan, RELEASE))
+        assertEquals('i386', getHeaderEntryString(scan, ARCH))
+        assertEquals('linux', getHeaderEntryString(scan, OS))
+        assertEquals(['./a/path/not/to/create/alone', './opt/bleah',
+                './opt/bleah/apple', './opt/bleah/banana'], scan.files*.name)
+        assertEquals([FILE, DIR, FILE, SYMLINK], scan.files*.type)
+
+        project.apply plugin: 'java'
+        project.task([type: Tar], 'buildJar', {
+            destinationDir = project.file('build/tmp/RpmPluginTest')
+            with rpmCopySpec
+        })
+        project.tasks.buildJar.execute()
     }
 
     @Test
