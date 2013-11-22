@@ -59,6 +59,8 @@ class Rpm extends AbstractArchiveTask {
     File postUninstall
     List<Link> links = new ArrayList<Link>()
     List<Dependency> dependencies = new ArrayList<Dependency>();
+    List<Dependency> obsoletes = new ArrayList<Dependency>();
+    List<Dependency> conflicts = new ArrayList<Dependency>();
 
     Rpm() {
         action = new RpmCopyAction(services.get(Instantiator.class), services.get(FileResolver.class))
@@ -139,16 +141,41 @@ class Rpm extends AbstractArchiveTask {
     }
 
     Dependency requires(String packageName, String version, int flag) {
-        Dependency dep = new Dependency()
-        dep.packageName = packageName
-        dep.version = version
-        dep.flag = flag
+        Dependency dep = createDependency(packageName, version, flag)
         dependencies.add(dep)
         dep
     }
 
     Dependency requires(String packageName) {
         requires(packageName, '', 0)
+    }
+
+    Dependency obsolete(String packageName, String version, int flag) {
+        Dependency obs = createDependency(packageName, version, flag)
+        obsoletes.add(obs)
+        obs
+    }
+
+    Dependency obsolete(String packageName) {
+        obsolete(packageName, '', 0)
+    }
+
+    Dependency conflict(String packageName, String version, int flag) {
+        Dependency conf = createDependency(packageName, version, flag)
+        conflicts.add(conf)
+        conf
+    }
+
+    Dependency conflict(String packageName) {
+        conflict(packageName, '', 0)
+    }
+
+    private Dependency createDependency(String packageName, String version, int flag) {
+        Dependency dep = new Dependency()
+        dep.packageName = packageName
+        dep.version = version
+        dep.flag = flag
+        dep
     }
 
     class RpmCopyAction extends CopyActionImpl {

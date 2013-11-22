@@ -105,6 +105,16 @@ class RpmCopySpecVisitor extends EmptyCopySpecVisitor {
             builder.addDependency dep.packageName, dep.version, dep.flag
         }
 
+        for (Dependency dep : task.obsoletes) {
+            logger.debug "adding obsolete on {} {}", dep.packageName, dep.version
+            builder.addObsoletes dep.packageName, dep.version, dep.flag
+        }
+
+        for (Dependency dep : task.conflicts) {
+            logger.debug "adding conflict on {} {}", dep.packageName, dep.version
+            builder.addConflicts dep.packageName, dep.version, dep.flag
+        }
+
         String rpmFile = builder.build(destinationDir)
         didWork = true
         logger.info 'Created rpm {}', rpmFile
